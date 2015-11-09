@@ -158,6 +158,35 @@ To use this convenience, you simply wrap the `cmd:run` output in a subshell. Run
 
 	$ $(docker run --rm progrium/consul cmd:run 127.0.0.1 -it)
 
+#### Overlay Clusters
+
+With the release of overlay networks you no longer need to map host ports or inject knowledge of the host IP address. Running with `cmd:container [-s] [-j join_hostname] [-b bootstrap count]` will let you create a cluster on your overlay network. For example:
+
+	# Create an overlay named mesh
+	docker network create -d overlay mesh
+	# Create the first Consul server expecting 3 peers
+	docker run -d --name sd-consul-1 -h sd-consul-1 \
+		--net mesh \
+		allingeek/consul \
+		cmd:container -s -b 3
+	# Create the first peer and join to sd-consul-1
+	docker run -d --name sd-consul-2 -h sd-consul-2 \
+		--net mesh \
+		allingeek/consul \
+		cmd:container -s -j sd-consul-1
+	# Create the second peer and join to sd-consul-1
+	docker run -d --name sd-consul-3 -h sd-consul-3 \
+		--net mesh \
+		allingeek/consul \
+		cmd:container -s -j sd-consul-1
+	# Create a client node that joins the network
+	docker run -d --name sd-consul-4 -h sd-consul-4 \
+		--net mesh \
+		allingeek/consul \
+		cmd:container -j sd-consul-1 
+
+This command has three options. The first `-s` will start Consul in server mode if present. If omitted the server is started in client mode. The second, `-b N` will bootstrap a server expecting N total nodes. Last, `-j name` will cause the server to join the node located at `name`. Name will be resolved to the overlay network IP address of the primary node.
+
 ##### Client flag
 
 Client nodes allow you to keep growing your cluster without impacting the performance of the underlying gossip protocol (they proxy requests to one of the server nodes and so are stateless).

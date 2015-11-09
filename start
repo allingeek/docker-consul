@@ -38,12 +38,35 @@ eval docker run --name consul -h \$HOSTNAME \
 EOF
 }
 
+readonly CONTAINER_ARGS="sj:b:"
+
+cmd-container() {
+	local args="$@"
+	local own_ip="$(getent hosts $HOSTNAME | awk '{ print $1 }')"
+	# own_ip="$(ip ro | awk '/eth0/{print $5}')"
+	
+	declare run_mode server_flag
+	
+	while getopts $CONTAINER_ARGS opt ; do
+		case $opt in
+			s) server_flag="-server";;
+			j) run_mode="-join $(getent hosts $OPTARG | awk '{ print $1 }')";;
+			b) run_mode="-bootstrap-expect $OPTARG";;
+			\?) echo "Invalid option: -$OPTARG" >&2;;
+  		esac
+	done
+
+	exec /bin/consul agent -config-dir=/config $server_flag -advertise $own_ip $run_mode
+}
+
 main() {
 	set -eo pipefail
 	case "$1" in
 	cmd:run)            shift; cmd-run $@;;
+	cmd:container)      shift; cmd-container $@;;
 	*)                  exec /bin/consul agent -config-dir=/config $@;;
 	esac
 }
 
 main "$@"
+
